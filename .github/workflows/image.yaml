@@ -15,7 +15,7 @@ jobs:
         secret_access_key: ${{ secrets.BUILD_BOT_AWS_ACCESS_SECRET }}
         account_id: ${{ secrets.AWS_ACCOUNT_ID }}
         region: ${{ env.AWS_REGION }}
-        repo: ${{ AWS_ECR_REPO }}
+        repo: ${{ env.AWS_ECR_REPO }}
         tags: ${{ github.sha }}
         path: ./docker/debug
         create_repo: true

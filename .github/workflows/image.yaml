@@ -3,19 +3,59 @@ on: [push]
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      AWS_ECR_REPO: clickhouse-server
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
     steps:
-    - uses: actions/checkout@v2
-    - name: AWS ECR
-      uses: docker://ghcr.io/kciter/aws-ecr-action:latest
-      env:
-        AWS_REGION: us-east-1
-        AWS_ECR_REPO: clickhouse-server
-      with:
-        access_key_id: ${{ secrets.BUILD_BOT_AWS_ACCESS_KEY }}
-        secret_access_key: ${{ secrets.BUILD_BOT_AWS_ACCESS_SECRET }}
-        account_id: ${{ secrets.AWS_ACCOUNT_ID }}
-        region: ${{ env.AWS_REGION }}
-        repo: ${{ env.AWS_ECR_REPO }}
-        tags: ${{ github.sha }}
-        path: ./docker/debug
-        create_repo: true
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.BUILD_BOT_AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.BUILD_BOT_AWS_ACCESS_SECRET }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Create ECR repo if missing
+        uses: byu-oit/github-action-create-ecr-repo-if-missing@v1
+        with:
+          DOCKER_REPO_NAME: ${{ env.AWS_ECR_REPO }}
+
+      - name: Build the Docker image
+        run: |
+          export ECR_IMAGE_NAME=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.AWS_ECR_REPO }}:latest
+          echo "$ECR_IMAGE_NAME"
+          docker build ./docker/debug --tag "$ECR_IMAGE_NAME"
+          docker push $ECR_IMAGE_NAME
+
+
+
+      # - name: Push to Amazon ECR
+      #   # env:
+      #   #   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      #   run: |
+      #     export ECR_IMAGE_NAME="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/clickhouse-server:latest"
+      #     echo "$ECR_IMAGE_NAME"
+      #     docker image tag $AWS_ECR_REPO $ECR_IMAGE_NAME
+      #     docker push $ECR_IMAGE_NAME
+
+    # - name: AWS ECR
+    #   uses: docker://ghcr.io/kciter/aws-ecr-action:latest
+    #   env:
+    #     AWS_REGION: us-east-1
+    #     AWS_ECR_REPO: clickhouse-server
+    #   with:
+    #     access_key_id: ${{ secrets.BUILD_BOT_AWS_ACCESS_KEY }}
+    #     secret_access_key: ${{ secrets.BUILD_BOT_AWS_ACCESS_SECRET }}
+    #     account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+    #     region: ${{ env.AWS_REGION }}
+    #     repo: ${{ env.AWS_ECR_REPO }}
+    #     tags: ${{ github.sha }}
+    #     path: ./docker/debug
+    #     create_repo: true
